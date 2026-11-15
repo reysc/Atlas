@@ -1732,6 +1732,7 @@
       "refresh": "Refresh",
       "allTypes": "All types",
       "allStatus": "All statuses",
+      "allProviders": "All providers",
       "totalCount": "{{count}} records",
       "loading": "Loading...",
       "noData": "No records",
@@ -1741,6 +1742,7 @@
         "user": "User",
         "recipient": "Recipient",
         "type": "Type",
+        "provider": "Provider",
         "status": "Status",
         "subject": "Subject",
         "ip": "IP",
@@ -1754,6 +1756,12 @@
         "email_change": "Email Change",
         "email_verify": "Email Verification",
         "account_delete": "Account Deletion"
+      },
+      "providers": {
+        "cloudflare": "Cloudflare",
+        "resend": "Resend",
+        "mailtrap": "Mailtrap",
+        "brevo": "Brevo"
       },
       "status": {
         "sent": "Sent",

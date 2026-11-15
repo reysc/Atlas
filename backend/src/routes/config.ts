@@ -84,6 +84,15 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
     isSensitive: 0,
     validationRules: '{"min": -1, "max": 99}',
   },
+  'email_priority_brevo': {
+    value: '3',
+    description: 'Brevo 邮件优先级（数值越小越优先；-1 表示停用）',
+    configType: 'integer',
+    configGroup: 'email',
+    isPublic: 0,
+    isSensitive: 0,
+    validationRules: '{"min": -1, "max": 99}',
+  },
   'email_daily_limit_cloudflare': {
     value: '100',
     description: 'Cloudflare 每日发送上限（0 表示不限额，达到后自动使用下一优先级）',
@@ -105,6 +114,15 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
   'email_daily_limit_mailtrap': {
     value: '100',
     description: 'Mailtrap 每日发送上限（0 表示不限额，达到后自动使用下一优先级）',
+    configType: 'integer',
+    configGroup: 'email',
+    isPublic: 0,
+    isSensitive: 0,
+    validationRules: '{"min": 0, "max": 1000000}',
+  },
+  'email_daily_limit_brevo': {
+    value: '100',
+    description: 'Brevo 每日发送上限（0 表示不限额，达到后自动使用下一优先级）',
     configType: 'integer',
     configGroup: 'email',
     isPublic: 0,
@@ -445,6 +463,7 @@ configRoutes.get('/email/logs', async (c) => {
   const pageSize = Math.min(parseInt(c.req.query('pageSize') || '50'), 200);
   const emailType = c.req.query('type');
   const status = c.req.query('status');
+  const provider = c.req.query('provider');
 
   try {
     let whereClause = 'WHERE 1=1';
@@ -458,6 +477,11 @@ configRoutes.get('/email/logs', async (c) => {
     if (status) {
       whereClause += ' AND send_status = ?';
       params.push(status);
+    }
+
+    if (provider) {
+      whereClause += ' AND provider = ?';
+      params.push(provider);
     }
 
     const countResult = await c.env.DB.prepare(

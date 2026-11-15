@@ -40,6 +40,8 @@ export interface Env {
   MAILTRAP_API_TOKEN?: string;
   /** Mailtrap 发送地址；默认生产端点，测试 Sandbox 时改为 sandbox 地址 */
   MAILTRAP_API_URL?: string;
+  /** Brevo API Key（Transactional Email） */
+  BREVO_API_KEY?: string;
 
   // 部署级 vars（对应 wrangler.toml [vars]）
   APP_VERSION?: string;

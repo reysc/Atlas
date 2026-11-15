@@ -38,7 +38,7 @@
 | 自定义域名 | 托管在 Cloudflare 的 Zone | 用于 Workers Custom Domain |
 | GitHub OAuth App | 必需 | 登录功能依赖 |
 | Google OAuth Client | 可选 | 不配则仅支持 GitHub 登录 |
-| Cloudflare Email Sending（Workers Paid）/ Mailtrap / Resend | 邮件功能需要 | 至少配置一家，否则验证码/通知邮件全部发不出 |
+| Cloudflare Email Sending（Workers Paid）/ Mailtrap / Resend / Brevo | 邮件功能需要 | 至少配置一家，否则验证码/通知邮件全部发不出 |
 | TMDB API Key | 可选 | 影视元数据搜索来源，缺失时该来源静默跳过 |
 
 ---
@@ -96,6 +96,7 @@ database_id = "<返回的 database_id>"
 | `RESEND_API_KEY` | 可选 | Resend API Key | 未配置时 Resend 不参与发送队列 |
 | `MAILTRAP_API_TOKEN` | 可选 | Mailtrap Email Sending API Token | 未配置时 Mailtrap 不参与发送队列 |
 | `MAILTRAP_API_URL` | 可选 | Mailtrap 发送端点 | 默认 `https://send.api.mailtrap.io/api/send`；Sandbox 测试时覆盖 |
+| `BREVO_API_KEY` | 可选 | Brevo Transactional Email API Key | 未配置时 Brevo 不参与发送队列 |
 | `RANKINGS_IMPORT_SECRET` | 榜单导入必需 | GitHub Actions 调 `/api/internal/rankings/import` 时的共享密钥 | 导入接口 401 |
 | `TMDB_API_KEY` | 可选 | 影视元数据搜索 | 该来源静默跳过 |
 
@@ -115,9 +116,9 @@ npx wrangler secret put TMDB_API_KEY
 
 #### 邮件服务商优先级与限额
 
-Cloudflare、Resend、Mailtrap 可以同时配置，发送时按管理端「系统配置 → 邮件」依次尝试：
+Cloudflare、Resend、Mailtrap、Brevo 可以同时配置，发送时按管理端「系统配置 → 邮件」依次尝试：
 
-1. `email_priority_cloudflare` / `email_priority_resend` / `email_priority_mailtrap`：默认 `0 / 1 / 2`，数值越小越优先，`-1` 停用；
+1. `email_priority_cloudflare` / `email_priority_resend` / `email_priority_mailtrap` / `email_priority_brevo`：默认 `0 / 1 / 2 / 3`，数值越小越优先，`-1` 停用；
 2. `email_daily_limit_*`：默认每家 `100` 封/天，`0` 不限额；达到上限自动跳到下一优先级；
 3. 未配置凭据或发送失败也会继续尝试下一家。
 
@@ -128,6 +129,8 @@ Cloudflare 启用前确认：
 3. 迁移 `38_email_provider_priority.sql` 已执行，管理端能看到优先级与限额配置。
 
 Mailtrap 启用前确认：API Token 具备发送权限、发件域名已在 Mailtrap 验证，并在 Sending Setup 中切换到 Transactional Stream 的 API 模式。
+
+Brevo 启用前确认：API Key 具备发送权限，发件域名/发件人已在 Brevo 完成验证。
 
 ### 3. 代码内的域名白名单（不属于环境变量）
 
@@ -183,6 +186,7 @@ Get-ChildItem ../database/[0-9]*.sql | Sort-Object Name | ForEach-Object {
 | `36_query_perf_indexes_phase2` | 第二轮查询性能索引 | 必需 |
 | `37_email_provider` | 邮件服务商选择配置 | 必需（可重复执行） |
 | `38_email_provider_priority` | 邮件服务商优先级与每日限额（替换旧的 email_provider） | 必需（可重复执行） |
+| `39_email_brevo` | Brevo 邮件服务商优先级与每日限额 | 必需（可重复执行） |
 
 除 `20` 外均可重复执行。本地库把 `--remote` 换成 `--local`。
 
@@ -399,7 +403,7 @@ SPA 回退**只能**由 `wrangler.toml` 的 `not_found_handling = "single-page-a
 
 ### Q6: 邮件全部发不出
 
-按顺序查：`email_priority_*` 与 `email_daily_limit_*` 配置 → 对应服务商凭据（Cloudflare 绑定 / `RESEND_API_KEY` / `MAILTRAP_API_TOKEN`）→ Cloudflare 域名 onboard 或 Resend/Mailtrap 域名验证 → `DEFAULT_FROM_EMAIL` 是否属于该服务商已验证域名 → `email_send_logs.status` / `error_message` / `provider` → `email_queue` 是否堆在 `failed` → 用户邮箱是否已验证、通知偏好是否开启。
+按顺序查：`email_priority_*` 与 `email_daily_limit_*` 配置 → 对应服务商凭据（Cloudflare 绑定 / `RESEND_API_KEY` / `MAILTRAP_API_TOKEN` / `BREVO_API_KEY`）→ Cloudflare 域名 onboard 或 Resend/Mailtrap/Brevo 域名验证 → `DEFAULT_FROM_EMAIL` 是否属于该服务商已验证域名 → `email_send_logs.status` / `error_message` / `provider` → `email_queue` 是否堆在 `failed` → 用户邮箱是否已验证、通知偏好是否开启。
 
 ### Q7: 页面能打开但所有接口失败
 

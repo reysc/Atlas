@@ -25,7 +25,7 @@ export interface OutgoingEmail {
   fromEmail?: string;
 }
 
-export type EmailProvider = 'cloudflare' | 'resend' | 'mailtrap';
+export type EmailProvider = 'cloudflare' | 'resend' | 'mailtrap' | 'brevo';
 
 export interface SendResult {
   ok: boolean;
@@ -147,6 +147,48 @@ export async function sendMailtrapEmail(env: Env, email: OutgoingEmail): Promise
   }
 }
 
+export async function sendBrevoEmail(env: Env, email: OutgoingEmail): Promise<SendResult> {
+  if (!env.BREVO_API_KEY) {
+    return { ok: false, error: '未配置 BREVO_API_KEY', provider: 'brevo' };
+  }
+
+  const { fromName, fromEmail } = resolveFrom(env, email);
+
+  try {
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': env.BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { email: fromEmail, name: fromName },
+        to: [{ email: email.to }],
+        subject: email.subject,
+        htmlContent: email.html,
+        textContent: email.text,
+        headers: email.headers,
+      }),
+    });
+    const result = (await response.json().catch(() => ({}))) as {
+      messageId?: string;
+      message?: string;
+      code?: string;
+    };
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: result.message || result.code || `HTTP ${response.status}`,
+        provider: 'brevo',
+      };
+    }
+    return { ok: true, messageId: result.messageId, provider: 'brevo' };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message, provider: 'brevo' };
+  }
+}
+
 export interface EmailProviderSetting {
   provider: EmailProvider;
   /** 数值越小越优先；-1 表示停用 */
@@ -156,7 +198,7 @@ export interface EmailProviderSetting {
   configured: boolean;
 }
 
-const PROVIDER_TIE_ORDER: EmailProvider[] = ['cloudflare', 'resend', 'mailtrap'];
+const PROVIDER_TIE_ORDER: EmailProvider[] = ['cloudflare', 'resend', 'mailtrap', 'brevo'];
 
 /** 读取管理端配置，返回按优先级排序的邮件服务商列表 */
 export async function getEmailProviderChain(env: Env): Promise<EmailProviderSetting[]> {
@@ -184,6 +226,12 @@ export async function getEmailProviderChain(env: Env): Promise<EmailProviderSett
       priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_MAILTRAP, 2),
       dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_MAILTRAP, 100),
       configured: Boolean(env.MAILTRAP_API_TOKEN),
+    },
+    {
+      provider: 'brevo',
+      priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_BREVO, 3),
+      dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_BREVO, 100),
+      configured: Boolean(env.BREVO_API_KEY),
     },
   ];
 
@@ -221,6 +269,8 @@ function dispatchToProvider(env: Env, provider: EmailProvider, email: OutgoingEm
       return sendCloudflareEmail(env, email);
     case 'mailtrap':
       return sendMailtrapEmail(env, email);
+    case 'brevo':
+      return sendBrevoEmail(env, email);
     default:
       return sendResendEmail(env, email);
   }

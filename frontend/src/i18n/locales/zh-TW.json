@@ -1732,6 +1732,7 @@
       "refresh": "重新整理",
       "allTypes": "全部類型",
       "allStatus": "全部狀態",
+      "allProviders": "全部供應商",
       "totalCount": "共 {{count}} 筆",
       "loading": "載入中...",
       "noData": "暫無記錄",
@@ -1741,6 +1742,7 @@
         "user": "使用者",
         "recipient": "收件人",
         "type": "類型",
+        "provider": "供應商",
         "status": "狀態",
         "subject": "主旨",
         "ip": "IP",
@@ -1754,6 +1756,12 @@
         "email_change": "修改信箱",
         "email_verify": "目前信箱驗證",
         "account_delete": "註銷帳戶"
+      },
+      "providers": {
+        "cloudflare": "Cloudflare",
+        "resend": "Resend",
+        "mailtrap": "Mailtrap",
+        "brevo": "Brevo"
       },
       "status": {
         "sent": "成功",

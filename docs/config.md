@@ -50,6 +50,7 @@ npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 npx wrangler secret put RESEND_API_KEY
 npx wrangler secret put MAILTRAP_API_TOKEN
+npx wrangler secret put BREVO_API_KEY
 npx wrangler secret put RANKINGS_IMPORT_SECRET
 ```
 
@@ -61,12 +62,13 @@ npx wrangler secret put RANKINGS_IMPORT_SECRET
 | `RESEND_API_KEY` | 否 | Resend API Key；配置后作为邮件服务商之一参与优先级排队 |
 | `MAILTRAP_API_TOKEN` | 否 | Mailtrap Email Sending API Token；配置后作为邮件服务商之一参与优先级排队 |
 | `MAILTRAP_API_URL` | 否 | Mailtrap 发送端点，默认 `https://send.api.mailtrap.io/api/send`；用 Sandbox 时改为 sandbox 地址 |
+| `BREVO_API_KEY` | 否 | Brevo Transactional Email API Key；配置后作为邮件服务商之一参与优先级排队 |
 | `RANKINGS_IMPORT_SECRET` | 否 | JavDB 榜单导入接口的共享密钥（`/api/internal/rankings/import`） |
 | `TMDB_API_KEY` | 否 | TMDB 影视元数据增强；不配置时回退到搜索源聚合结果 |
 
 > 搜索源以 D1 `search_sources` 为准，不需要 DMM/FANZA 的 API Key。
 
-### 邮件服务商（Cloudflare / Resend / Mailtrap）
+### 邮件服务商（Cloudflare / Resend / Mailtrap / Brevo）
 
 `backend/wrangler.toml` 已声明 Cloudflare 邮件绑定：
 
@@ -75,10 +77,10 @@ npx wrangler secret put RANKINGS_IMPORT_SECRET
 name = "EMAIL"
 ```
 
-三家服务商都可以同时配置，发送时按管理端优先级依次尝试：
+四家服务商都可以同时配置，发送时按管理端优先级依次尝试：
 
-- `email_priority_cloudflare` / `email_priority_resend` / `email_priority_mailtrap`：默认 `0 / 1 / 2`，数值越小越优先，`-1` 表示停用。
-- `email_daily_limit_cloudflare` / `email_daily_limit_resend` / `email_daily_limit_mailtrap`：默认 `100`，每天成功发送上限，`0` 表示不限额；达到上限自动切换到下一优先级。
+- `email_priority_cloudflare` / `email_priority_resend` / `email_priority_mailtrap` / `email_priority_brevo`：默认 `0 / 1 / 2 / 3`，数值越小越优先，`-1` 表示停用。
+- `email_daily_limit_cloudflare` / `email_daily_limit_resend` / `email_daily_limit_mailtrap` / `email_daily_limit_brevo`：默认每家 `100`，每天成功发送上限，`0` 表示不限额；达到上限自动切换到下一优先级。
 - 某个服务商未配置凭据或发送失败时，也会继续尝试下一优先级；每日额度按 Asia/Shanghai 自然日统计。
 
 各服务商准备：
@@ -86,6 +88,7 @@ name = "EMAIL"
 - **Cloudflare**：在面板 **Compute → Email Service → Email Sending** 为发件域完成 onboard，`DEFAULT_FROM_EMAIL` 必须属于该域名。
 - **Resend**：配置 `RESEND_API_KEY`，并确保发件域名已在 Resend 验证。
 - **Mailtrap**：配置 `MAILTRAP_API_TOKEN`，并确保发件域名已在 Mailtrap 验证；默认走 Transactional Stream。
+- **Brevo**：配置 `BREVO_API_KEY`，并确保发件域名/发件人已在 Brevo 验证；走 Transactional Email API。
 
 ---
 
@@ -213,8 +216,8 @@ database_id = "<创建 D1 后返回的 database_id>"
 | `password_reset_lockout_duration` | `3600000` | 找回密码锁定时长（毫秒） |
 | `email_rate_limit_per_hour` | `5` | 每用户每小时发信上限 |
 | `email_rate_limit_per_day` | `20` | 每用户每天发信上限 |
-| `email_priority_cloudflare` / `_resend` / `_mailtrap` | `0` / `1` / `2` | 邮件服务商优先级，越小越优先，`-1` 停用 |
-| `email_daily_limit_cloudflare` / `_resend` / `_mailtrap` | `100` | 服务商每日成功发送上限，`0` 不限额，达到后切换下一优先级 |
+| `email_priority_cloudflare` / `_resend` / `_mailtrap` / `_brevo` | `0` / `1` / `2` / `3` | 邮件服务商优先级，越小越优先，`-1` 停用 |
+| `email_daily_limit_cloudflare` / `_resend` / `_mailtrap` / `_brevo` | `100` | 服务商每日成功发送上限，`0` 不限额，达到后切换下一优先级 |
 | `verification_code_expiry` | `900000` | 验证码有效期（毫秒） |
 | `reset_password_code_expiry` | `1800000` | 找回密码验证码有效期（毫秒） |
 | `password_reset_log_retention_days` | `30` | 找回密码日志保留天数 |

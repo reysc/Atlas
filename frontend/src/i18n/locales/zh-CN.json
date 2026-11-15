@@ -1732,6 +1732,7 @@
       "refresh": "刷新",
       "allTypes": "全部类型",
       "allStatus": "全部状态",
+      "allProviders": "全部供应商",
       "totalCount": "共 {{count}} 条",
       "loading": "加载中...",
       "noData": "暂无记录",
@@ -1741,6 +1742,7 @@
         "user": "用户",
         "recipient": "收件人",
         "type": "类型",
+        "provider": "供应商",
         "status": "状态",
         "subject": "主题",
         "ip": "IP",
@@ -1754,6 +1756,12 @@
         "email_change": "修改邮箱",
         "email_verify": "当前邮箱验证",
         "account_delete": "注销账户"
+      },
+      "providers": {
+        "cloudflare": "Cloudflare",
+        "resend": "Resend",
+        "mailtrap": "Mailtrap",
+        "brevo": "Brevo"
       },
       "status": {
         "sent": "成功",
