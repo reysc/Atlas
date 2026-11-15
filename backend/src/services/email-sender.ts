@@ -216,20 +216,26 @@ export async function sendMailjetEmail(env: Env, email: OutgoingEmail): Promise<
         ],
       }),
     });
-    const result = (await response.json().catch(() => ({}))) as {
+    const raw = await response.text();
+    let result: {
       Messages?: Array<{
         Status?: string;
         Errors?: Array<{ ErrorMessage?: string; ErrorCode?: string }>;
         To?: Array<{ MessageUUID?: string; MessageID?: number }>;
       }>;
       ErrorMessage?: string;
-    };
+    } = {};
+    try {
+      result = raw ? JSON.parse(raw) : {};
+    } catch {
+      // 非 JSON 响应按原始文本返回，便于排查
+    }
     const message = result.Messages?.[0];
-    if (!response.ok || message?.Status === 'error') {
+    if (!response.ok || message?.Status !== 'success') {
       const detail =
         message?.Errors?.map((e) => e.ErrorMessage || e.ErrorCode).filter(Boolean).join('; ') ||
         result.ErrorMessage ||
-        `HTTP ${response.status}`;
+        (raw ? raw.slice(0, 300) : `HTTP ${response.status}`);
       return { ok: false, error: detail, provider: 'mailjet' };
     }
     const recipient = message?.To?.[0];
