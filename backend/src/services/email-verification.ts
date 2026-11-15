@@ -6,6 +6,7 @@ import {
   sendEmail as sendEmailViaProvider,
   logEmailSend as writeEmailSendLog,
   assertVerificationEmailRateLimit,
+  type EmailProvider,
 } from './email-sender';
 
 export type VerificationType =
@@ -508,7 +509,7 @@ export class EmailVerificationService {
     const htmlContent = this.renderTemplate(template.html_template, vars);
     const textContent = this.renderTemplate(template.text_template || '', vars);
 
-    let provider: 'cloudflare' | 'resend' = 'resend';
+    let provider: EmailProvider = 'resend';
     try {
       const result = await sendEmailViaProvider(this.env, {
         to: email,

@@ -36,6 +36,10 @@ export interface Env {
   // Secrets（通过 `wrangler secret put` 注入，不在 wrangler.toml 中出现）
   JWT_SECRET: string;
   RESEND_API_KEY?: string;
+  /** Mailtrap API Token（Email Sending → Transactional Stream） */
+  MAILTRAP_API_TOKEN?: string;
+  /** Mailtrap 发送地址；默认生产端点，测试 Sandbox 时改为 sandbox 地址 */
+  MAILTRAP_API_URL?: string;
 
   // 部署级 vars（对应 wrangler.toml [vars]）
   APP_VERSION?: string;

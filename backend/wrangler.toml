@@ -50,6 +50,8 @@ ENABLE_ALIAS_AI = "0"
 # 以下配置通过 `wrangler secret put` 注入（不得写入此文件中）：
 # 🔐 JWT_SECRET
 # 🔐 RESEND_API_KEY
+# 🔐 MAILTRAP_API_TOKEN     (Mailtrap Email Sending API Token，可选)
+# 🔐 MAILTRAP_API_URL       (可选：默认 https://send.api.mailtrap.io/api/send)
 # 🔐 TMDB_API_KEY            (影视元数据搜索，缺失时该来源静默跳过)
 # 🔐 GITHUB_CLIENT_ID        (GitHub OAuth App Client ID)
 # 🔐 GITHUB_CLIENT_SECRET    (GitHub OAuth App Client Secret)

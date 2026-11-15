@@ -25,7 +25,7 @@ export interface OutgoingEmail {
   fromEmail?: string;
 }
 
-export type EmailProvider = 'cloudflare' | 'resend';
+export type EmailProvider = 'cloudflare' | 'resend' | 'mailtrap';
 
 export interface SendResult {
   ok: boolean;
@@ -103,30 +103,168 @@ export async function sendCloudflareEmail(env: Env, email: OutgoingEmail): Promi
   }
 }
 
-/** 读取管理端配置的邮件服务商；默认 Cloudflare */
-export async function getEmailProvider(env: Env): Promise<EmailProvider> {
-  const value = await new ConfigService(env).get(DB_CONFIG_KEYS.EMAIL_PROVIDER, 'cloudflare');
-  return value === 'resend' ? 'resend' : 'cloudflare';
+export async function sendMailtrapEmail(env: Env, email: OutgoingEmail): Promise<SendResult> {
+  if (!env.MAILTRAP_API_TOKEN) {
+    return { ok: false, error: '未配置 MAILTRAP_API_TOKEN', provider: 'mailtrap' };
+  }
+
+  const { fromName, fromEmail } = resolveFrom(env, email);
+  const endpoint = env.MAILTRAP_API_URL || 'https://send.api.mailtrap.io/api/send';
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.MAILTRAP_API_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: { email: fromEmail, name: fromName },
+        to: [{ email: email.to }],
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+        headers: email.headers,
+      }),
+    });
+    const result = (await response.json().catch(() => ({}))) as {
+      success?: boolean;
+      message_ids?: string[];
+      errors?: string[] | Record<string, string>;
+      error?: string;
+    };
+    if (!response.ok || result.success === false) {
+      const detail = Array.isArray(result.errors)
+        ? result.errors.join('; ')
+        : result.errors
+          ? JSON.stringify(result.errors)
+          : result.error || `HTTP ${response.status}`;
+      return { ok: false, error: detail, provider: 'mailtrap' };
+    }
+    return { ok: true, messageId: result.message_ids?.[0], provider: 'mailtrap' };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message, provider: 'mailtrap' };
+  }
+}
+
+export interface EmailProviderSetting {
+  provider: EmailProvider;
+  /** 数值越小越优先；-1 表示停用 */
+  priority: number;
+  /** 每日发送上限；0 表示不限额 */
+  dailyLimit: number;
+  configured: boolean;
+}
+
+const PROVIDER_TIE_ORDER: EmailProvider[] = ['cloudflare', 'resend', 'mailtrap'];
+
+/** 读取管理端配置，返回按优先级排序的邮件服务商列表 */
+export async function getEmailProviderChain(env: Env): Promise<EmailProviderSetting[]> {
+  const config = await new ConfigService(env).getAll();
+  const readInt = (key: string, fallback: number): number => {
+    const parsed = parseInt(config[key] ?? '', 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  const chain: EmailProviderSetting[] = [
+    {
+      provider: 'cloudflare',
+      priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_CLOUDFLARE, 0),
+      dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_CLOUDFLARE, 100),
+      configured: Boolean(env.EMAIL),
+    },
+    {
+      provider: 'resend',
+      priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_RESEND, 1),
+      dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_RESEND, 100),
+      configured: Boolean(env.RESEND_API_KEY),
+    },
+    {
+      provider: 'mailtrap',
+      priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_MAILTRAP, 2),
+      dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_MAILTRAP, 100),
+      configured: Boolean(env.MAILTRAP_API_TOKEN),
+    },
+  ];
+
+  return chain.sort(
+    (a, b) => a.priority - b.priority || PROVIDER_TIE_ORDER.indexOf(a.provider) - PROVIDER_TIE_ORDER.indexOf(b.provider)
+  );
+}
+
+/** 当日 0 点（Asia/Shanghai）的时间戳 */
+function startOfDayCst(now = Date.now()): number {
+  const offset = 8 * 60 * 60 * 1000;
+  return Math.floor((now + offset) / CONFIG.Stats.DAY_IN_MS) * CONFIG.Stats.DAY_IN_MS - offset;
+}
+
+/** 统计某服务商今天已成功发送的邮件数 */
+async function countProviderSentToday(env: Env, provider: EmailProvider): Promise<number> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT COUNT(*) as count FROM email_send_logs
+       WHERE provider = ? AND send_status = 'sent' AND created_at >= ?`
+    )
+      .bind(provider, startOfDayCst())
+      .first<{ count: number }>();
+    return row?.count ?? 0;
+  } catch (err) {
+    // 限额统计失败不阻断发信
+    console.warn('[email] provider daily usage read failed:', err);
+    return 0;
+  }
+}
+
+function dispatchToProvider(env: Env, provider: EmailProvider, email: OutgoingEmail): Promise<SendResult> {
+  switch (provider) {
+    case 'cloudflare':
+      return sendCloudflareEmail(env, email);
+    case 'mailtrap':
+      return sendMailtrapEmail(env, email);
+    default:
+      return sendResendEmail(env, email);
+  }
 }
 
 /**
- * 统一发送入口：按配置选择服务商。
- * Cloudflare 绑定缺失或发送失败时，若配置了 Resend 则自动回退。
+ * 统一发送入口：按管理端配置的优先级依次尝试。
+ * 未配置、已停用（优先级 -1）或达到每日上限的服务商会被跳过，
+ * 发送失败也会继续尝试下一优先级。
  */
 export async function sendEmail(env: Env, email: OutgoingEmail): Promise<SendResult> {
-  const provider = await getEmailProvider(env);
-  if (provider === 'resend') {
-    return sendResendEmail(env, email);
+  const chain = await getEmailProviderChain(env);
+  const attempts: string[] = [];
+
+  for (const setting of chain) {
+    if (setting.priority < 0) continue;
+    if (!setting.configured) {
+      attempts.push(`${setting.provider}: 未配置`);
+      continue;
+    }
+    if (setting.dailyLimit > 0) {
+      const used = await countProviderSentToday(env, setting.provider);
+      if (used >= setting.dailyLimit) {
+        attempts.push(`${setting.provider}: 今日已达限额 ${setting.dailyLimit}`);
+        continue;
+      }
+    }
+
+    const result = await dispatchToProvider(env, setting.provider, email);
+    if (result.ok) {
+      if (attempts.length > 0) {
+        console.warn(`[email] 已切换到 ${setting.provider}（${attempts.join(' | ')}）`);
+      }
+      return result;
+    }
+    attempts.push(`${setting.provider}: ${result.error}`);
   }
 
-  const result = await sendCloudflareEmail(env, email);
-  if (result.ok) return result;
-
-  if (env.RESEND_API_KEY) {
-    console.warn('[email] Cloudflare 发送失败，回退 Resend:', result.error);
-    return sendResendEmail(env, email);
-  }
-  return result;
+  return {
+    ok: false,
+    error: attempts.length > 0
+      ? `没有可用的邮件服务商（${attempts.join('；')}）`
+      : '没有可用的邮件服务商（均未配置或已停用）',
+  };
 }
 
 // ─── 统一发送日志 ────────────────────────────────────────────────────────
