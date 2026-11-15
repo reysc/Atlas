@@ -42,6 +42,10 @@ export interface Env {
   MAILTRAP_API_URL?: string;
   /** Brevo API Key（Transactional Email） */
   BREVO_API_KEY?: string;
+  /** Mailjet API Key（Basic Auth 用户名） */
+  MAILJET_API_KEY?: string;
+  /** Mailjet API Secret（Basic Auth 密码） */
+  MAILJET_API_SECRET?: string;
 
   // 部署级 vars（对应 wrangler.toml [vars]）
   APP_VERSION?: string;

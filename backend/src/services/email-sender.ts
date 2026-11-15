@@ -25,7 +25,7 @@ export interface OutgoingEmail {
   fromEmail?: string;
 }
 
-export type EmailProvider = 'cloudflare' | 'resend' | 'mailtrap' | 'brevo';
+export type EmailProvider = 'cloudflare' | 'resend' | 'mailtrap' | 'brevo' | 'mailjet';
 
 export interface SendResult {
   ok: boolean;
@@ -189,6 +189,60 @@ export async function sendBrevoEmail(env: Env, email: OutgoingEmail): Promise<Se
   }
 }
 
+export async function sendMailjetEmail(env: Env, email: OutgoingEmail): Promise<SendResult> {
+  if (!env.MAILJET_API_KEY || !env.MAILJET_API_SECRET) {
+    return { ok: false, error: '未配置 MAILJET_API_KEY / MAILJET_API_SECRET', provider: 'mailjet' };
+  }
+
+  const { fromName, fromEmail } = resolveFrom(env, email);
+
+  try {
+    const response = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${btoa(`${env.MAILJET_API_KEY}:${env.MAILJET_API_SECRET}`)}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: { Email: fromEmail, Name: fromName },
+            To: [{ Email: email.to }],
+            Subject: email.subject,
+            TextPart: email.text,
+            HTMLPart: email.html,
+            Headers: email.headers,
+          },
+        ],
+      }),
+    });
+    const result = (await response.json().catch(() => ({}))) as {
+      Messages?: Array<{
+        Status?: string;
+        Errors?: Array<{ ErrorMessage?: string; ErrorCode?: string }>;
+        To?: Array<{ MessageUUID?: string; MessageID?: number }>;
+      }>;
+      ErrorMessage?: string;
+    };
+    const message = result.Messages?.[0];
+    if (!response.ok || message?.Status === 'error') {
+      const detail =
+        message?.Errors?.map((e) => e.ErrorMessage || e.ErrorCode).filter(Boolean).join('; ') ||
+        result.ErrorMessage ||
+        `HTTP ${response.status}`;
+      return { ok: false, error: detail, provider: 'mailjet' };
+    }
+    const recipient = message?.To?.[0];
+    return {
+      ok: true,
+      messageId: recipient?.MessageUUID || (recipient?.MessageID ? String(recipient.MessageID) : undefined),
+      provider: 'mailjet',
+    };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message, provider: 'mailjet' };
+  }
+}
+
 export interface EmailProviderSetting {
   provider: EmailProvider;
   /** 数值越小越优先；-1 表示停用 */
@@ -198,7 +252,7 @@ export interface EmailProviderSetting {
   configured: boolean;
 }
 
-const PROVIDER_TIE_ORDER: EmailProvider[] = ['cloudflare', 'resend', 'mailtrap', 'brevo'];
+const PROVIDER_TIE_ORDER: EmailProvider[] = ['cloudflare', 'resend', 'mailtrap', 'brevo', 'mailjet'];
 
 /** 读取管理端配置，返回按优先级排序的邮件服务商列表 */
 export async function getEmailProviderChain(env: Env): Promise<EmailProviderSetting[]> {
@@ -232,6 +286,12 @@ export async function getEmailProviderChain(env: Env): Promise<EmailProviderSett
       priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_BREVO, 3),
       dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_BREVO, 100),
       configured: Boolean(env.BREVO_API_KEY),
+    },
+    {
+      provider: 'mailjet',
+      priority: readInt(DB_CONFIG_KEYS.EMAIL_PRIORITY_MAILJET, 4),
+      dailyLimit: readInt(DB_CONFIG_KEYS.EMAIL_DAILY_LIMIT_MAILJET, 100),
+      configured: Boolean(env.MAILJET_API_KEY && env.MAILJET_API_SECRET),
     },
   ];
 
@@ -271,6 +331,8 @@ function dispatchToProvider(env: Env, provider: EmailProvider, email: OutgoingEm
       return sendMailtrapEmail(env, email);
     case 'brevo':
       return sendBrevoEmail(env, email);
+    case 'mailjet':
+      return sendMailjetEmail(env, email);
     default:
       return sendResendEmail(env, email);
   }

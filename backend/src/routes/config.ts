@@ -93,6 +93,15 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
     isSensitive: 0,
     validationRules: '{"min": -1, "max": 99}',
   },
+  'email_priority_mailjet': {
+    value: '4',
+    description: 'Mailjet 邮件优先级（数值越小越优先；-1 表示停用）',
+    configType: 'integer',
+    configGroup: 'email',
+    isPublic: 0,
+    isSensitive: 0,
+    validationRules: '{"min": -1, "max": 99}',
+  },
   'email_daily_limit_cloudflare': {
     value: '100',
     description: 'Cloudflare 每日发送上限（0 表示不限额，达到后自动使用下一优先级）',
@@ -123,6 +132,15 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
   'email_daily_limit_brevo': {
     value: '100',
     description: 'Brevo 每日发送上限（0 表示不限额，达到后自动使用下一优先级）',
+    configType: 'integer',
+    configGroup: 'email',
+    isPublic: 0,
+    isSensitive: 0,
+    validationRules: '{"min": 0, "max": 1000000}',
+  },
+  'email_daily_limit_mailjet': {
+    value: '100',
+    description: 'Mailjet 每日发送上限（0 表示不限额，达到后自动使用下一优先级）',
     configType: 'integer',
     configGroup: 'email',
     isPublic: 0,

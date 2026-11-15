@@ -28,7 +28,7 @@ const QUEUE_TYPES = [
 
 const LOG_STATUS = ['sent', 'failed'] as const;
 const QUEUE_STATUS = ['pending', 'sent', 'skipped', 'failed'] as const;
-const EMAIL_PROVIDERS = ['cloudflare', 'resend', 'mailtrap', 'brevo'] as const;
+const EMAIL_PROVIDERS = ['cloudflare', 'resend', 'mailtrap', 'brevo', 'mailjet'] as const;
 
 const statusClass = (status: string) => clsx(
   'inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium',

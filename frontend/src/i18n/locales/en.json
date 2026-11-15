@@ -1761,7 +1761,8 @@
         "cloudflare": "Cloudflare",
         "resend": "Resend",
         "mailtrap": "Mailtrap",
-        "brevo": "Brevo"
+        "brevo": "Brevo",
+        "mailjet": "Mailjet"
       },
       "status": {
         "sent": "Sent",

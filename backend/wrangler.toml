@@ -53,6 +53,8 @@ ENABLE_ALIAS_AI = "0"
 # 🔐 MAILTRAP_API_TOKEN     (Mailtrap Email Sending API Token，可选)
 # 🔐 MAILTRAP_API_URL       (可选：默认 https://send.api.mailtrap.io/api/send)
 # 🔐 BREVO_API_KEY          (Brevo Transactional Email API Key，可选)
+# 🔐 MAILJET_API_KEY        (Mailjet API Key，可选)
+# 🔐 MAILJET_API_SECRET     (Mailjet API Secret，可选)
 # 🔐 TMDB_API_KEY            (影视元数据搜索，缺失时该来源静默跳过)
 # 🔐 GITHUB_CLIENT_ID        (GitHub OAuth App Client ID)
 # 🔐 GITHUB_CLIENT_SECRET    (GitHub OAuth App Client Secret)
