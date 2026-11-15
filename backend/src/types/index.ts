@@ -13,9 +13,23 @@ export interface WorkersAiBinding {
   run(model: string, inputs: Record<string, unknown>): Promise<unknown>;
 }
 
+/** Cloudflare Email Service send_email 绑定的最小接口 */
+export interface EmailBinding {
+  send(message: {
+    to: string | { email: string; name?: string };
+    from: string | { email: string; name?: string };
+    subject: string;
+    html?: string;
+    text?: string;
+    headers?: Record<string, string>;
+  }): Promise<{ messageId: string }>;
+}
+
 export interface Env {
   // 基础设施绑定
   DB: D1Database;
+  /** Cloudflare Email Service（Workers Paid；wrangler.toml 的 send_email 绑定） */
+  EMAIL?: EmailBinding;
   /** Workers AI（可选：仅在启用别名候选生成时需要） */
   AI?: WorkersAiBinding;
 

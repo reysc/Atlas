@@ -1400,7 +1400,8 @@
         "integer": "Integer",
         "float": "Float",
         "boolean": "Boolean",
-        "json": "JSON"
+        "json": "JSON",
+        "select": "Select"
       },
       "loadFailed": "Load failed",
       "loadLogsFailed": "Failed to load logs",

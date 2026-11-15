@@ -45,7 +45,7 @@ configRoutes.use('*', authMiddleware);
 
 // 不再使用本地权限检查函数，改用从 middleware/auth.ts 导入的 checkIsAdmin/checkIsSuperAdmin
 
-const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string; configType: string; configGroup: string; isPublic: number; isSensitive: number; validationRules?: string }> = {
+const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string; configType: string; configGroup: string; isPublic: number; isSensitive: number; validationRules?: string; options?: string }> = {
   'site_name': { value: 'Atlas', description: '网站名称', configType: 'string', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
   'site_description': { value: '搜索全网资源，一步直达', description: '网站描述', configType: 'string', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
   'enable_registration': { value: '1', description: '是否开放注册', configType: 'boolean', configGroup: 'basic', isPublic: 1, isSensitive: 0 },
@@ -57,6 +57,15 @@ const DEFAULT_CONFIG_VALUES: Record<string, { value: string; description: string
   'password_reset_lockout_duration': { value: '3600000', description: '密码重置锁定持续时间（毫秒，默认1小时）', configType: 'integer', configGroup: 'security', isPublic: 0, isSensitive: 0, validationRules: '{"min": 300000, "max": 86400000}' },
   'email_rate_limit_per_hour': { value: '5', description: '每小时最大发送邮件数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 20}' },
   'email_rate_limit_per_day': { value: '20', description: '每天最大发送邮件数', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 1, "max": 100}' },
+  'email_provider': {
+    value: 'cloudflare',
+    description: '邮件发送服务商。cloudflare = Cloudflare Email Sending（Workers Paid，优先使用）；resend = Resend。选择 cloudflare 时若绑定缺失或发送失败，且已配置 Resend，会自动回退到 Resend。',
+    configType: 'select',
+    configGroup: 'email',
+    isPublic: 0,
+    isSensitive: 0,
+    options: '[{"value":"cloudflare","label":"Cloudflare Email"},{"value":"resend","label":"Resend"}]',
+  },
   'verification_code_expiry': { value: '900000', description: '验证码过期时间（毫秒，默认15分钟）', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 60000, "max": 3600000}' },
   'reset_password_code_expiry': { value: '1800000', description: '重置密码验证码过期时间（毫秒，默认30分钟）', configType: 'integer', configGroup: 'email', isPublic: 0, isSensitive: 0, validationRules: '{"min": 600000, "max": 7200000}' },
   'password_reset_log_retention_days': { value: '30', description: '密码重置日志保留天数', configType: 'integer', configGroup: 'cleanup', isPublic: 0, isSensitive: 0, validationRules: '{"min": 7, "max": 90}' },
@@ -102,7 +111,19 @@ async function logConfigChange(
   }
 }
 
-function validateConfigValue(value: string, configType: string, validationRules?: string | null): { valid: boolean; error?: string } {
+function validateConfigValue(
+  value: string,
+  configType: string,
+  validationRules?: string | null,
+  options?: string | null
+): { valid: boolean; error?: string } {
+  if (configType === 'select') {
+    const allowed = parseSelectOptions(options);
+    if (allowed.length > 0 && !allowed.includes(value)) {
+      return { valid: false, error: `值必须是以下之一：${allowed.join(' / ')}` };
+    }
+    return { valid: true };
+  }
   if (!validationRules) return { valid: true };
 
   try {
@@ -154,6 +175,24 @@ function validateConfigValue(value: string, configType: string, validationRules?
     return { valid: true };
   } catch {
     return { valid: true };
+  }
+}
+
+/** 解析 system_config.options：既支持 ["a","b"]，也支持 [{value,label}] */
+function parseSelectOptions(raw?: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && 'value' in item) return String(item.value);
+        return '';
+      })
+      .filter(Boolean);
+  } catch {
+    return [];
   }
 }
 
@@ -601,7 +640,8 @@ configRoutes.put('/batch', validateBody(schemas.config.batchUpdateConfig), async
         const validation = validateConfigValue(
           value, 
           existing?.config_type || 'string', 
-          existing?.validation_rules
+          existing?.validation_rules,
+          existing?.options
         );
 
         if (!validation.valid) {
@@ -727,8 +767,9 @@ configRoutes.put('/:key', validateBody(schemas.config.updateConfig), async (c) =
 
     const configTypeToUse = configType || existing?.config_type || 'string';
     const validationRules = existing?.validation_rules || DEFAULT_CONFIG_VALUES[key]?.validationRules || null;
+    const optionsToUse = existing?.options || DEFAULT_CONFIG_VALUES[key]?.options || null;
 
-    const validation = validateConfigValue(value, configTypeToUse, validationRules);
+    const validation = validateConfigValue(value, configTypeToUse, validationRules, optionsToUse);
     if (!validation.valid) {
       return c.json(error('VALIDATION_ERROR', validation.error || '配置值验证失败'), 400);
     }

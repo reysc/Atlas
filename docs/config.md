@@ -57,11 +57,22 @@ npx wrangler secret put RANKINGS_IMPORT_SECRET
 | `JWT_SECRET` | 是 | JWT 签名密钥，建议 32 字节以上随机字符串 |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | 是 | GitHub OAuth App |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 否 | Google OAuth，未配置时 Google 登录不可用 |
-| `RESEND_API_KEY` | 邮件功能必填 | Resend API Key；未配置时验证码/通知邮件发送失败并写入 `email_send_logs` |
+| `RESEND_API_KEY` | 否 | Resend API Key。邮件服务商选择 `resend` 时必需；选择 `cloudflare` 时仅作为 Cloudflare 发送失败后的回退 |
 | `RANKINGS_IMPORT_SECRET` | 否 | JavDB 榜单导入接口的共享密钥（`/api/internal/rankings/import`） |
 | `TMDB_API_KEY` | 否 | TMDB 影视元数据增强；不配置时回退到搜索源聚合结果 |
 
 > 搜索源以 D1 `search_sources` 为准，不需要 DMM/FANZA 的 API Key。
+
+### Cloudflare Email Sending（可选，优先）
+
+`backend/wrangler.toml` 已声明邮件绑定：
+
+```toml
+[[send_email]]
+name = "EMAIL"
+```
+
+使用前需要在 Cloudflare 面板 **Compute → Email Service → Email Sending** 为发件域完成 onboard，并确保 `DEFAULT_FROM_EMAIL` 属于该域名。`email_provider` 为 `cloudflare`（默认）时优先使用该绑定；绑定缺失或发送失败且配置了 `RESEND_API_KEY` 时自动回退到 Resend。
 
 ---
 
@@ -189,6 +200,7 @@ database_id = "<创建 D1 后返回的 database_id>"
 | `password_reset_lockout_duration` | `3600000` | 找回密码锁定时长（毫秒） |
 | `email_rate_limit_per_hour` | `5` | 每用户每小时发信上限 |
 | `email_rate_limit_per_day` | `20` | 每用户每天发信上限 |
+| `email_provider` | `cloudflare` | 邮件服务商：`cloudflare` / `resend`；Cloudflare 失败时自动回退 Resend |
 | `verification_code_expiry` | `900000` | 验证码有效期（毫秒） |
 | `reset_password_code_expiry` | `1800000` | 找回密码验证码有效期（毫秒） |
 | `password_reset_log_retention_days` | `30` | 找回密码日志保留天数 |

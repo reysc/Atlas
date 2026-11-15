@@ -32,7 +32,33 @@ const CONFIG_TYPE_LABELS: Record<string, string> = {
   float: 'admin:config.type.float',
   boolean: 'admin:config.type.boolean',
   json: 'admin:config.type.json',
+  select: 'admin:config.type.select',
 };
+
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
+/** 解析 system_config.options：兼容 ["a","b"] 与 [{value,label}] */
+function parseSelectOptions(raw: string | null | undefined): SelectOption[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item): SelectOption | null => {
+        if (typeof item === 'string') return { value: item, label: item };
+        if (item && typeof item === 'object' && typeof item.value === 'string') {
+          return { value: item.value, label: typeof item.label === 'string' ? item.label : item.value };
+        }
+        return null;
+      })
+      .filter((item): item is SelectOption => Boolean(item));
+  } catch {
+    return [];
+  }
+}
 
 const CONFIG_GROUP_ICONS: Record<string, React.ReactNode> = {
   basic: <Globe className="w-4 h-4" />,
@@ -256,6 +282,10 @@ export const ConfigTab: React.FC = () => {
             {t('admin:config.booleanNo')}
           </span>
         );
+      case 'select': {
+        const option = parseSelectOptions(config.options).find((item) => item.value === config.value);
+        return option?.label || config.value;
+      }
       default:
         return config.value;
     }
@@ -388,6 +418,27 @@ export const ConfigTab: React.FC = () => {
                   />
                   <span className="block mt-1 text-sm">{t('admin:config.booleanNo')}</span>
                 </button>
+              </div>
+            ) : editingConfig.config_type === 'select' && parseSelectOptions(editingConfig.options).length > 0 ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {parseSelectOptions(editingConfig.options).map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setEditValue(option.value)}
+                    className={`rounded-xl border-2 p-4 text-left transition-all ${
+                      editValue === option.value
+                        ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-surface-200 dark:border-surface-700'
+                    }`}
+                  >
+                    <span className="block text-sm font-medium text-surface-900 dark:text-surface-100">
+                      {option.label}
+                    </span>
+                    <span className="mt-0.5 block font-mono text-xs text-surface-500">
+                      {option.value}
+                    </span>
+                  </button>
+                ))}
               </div>
             ) : (
               <Input

@@ -10,7 +10,7 @@ import { feedbackSchema } from '@/utils/validators';
 import { checkIsAdmin } from '@/middleware/auth';
 import { z } from 'zod';
 import { validateBody, schemas } from '@/validation';
-import { sendResendEmail, logEmailSend } from '@/services/email-sender';
+import { sendEmail, logEmailSend } from '@/services/email-sender';
 
 export const feedbackRoutes = new Hono<{ Bindings: Env }>();
 
@@ -357,7 +357,7 @@ async function sendFeedbackReplyEmail(
   adminReply: string,
   newStatus: string
 ): Promise<{ sent: boolean; error?: string }> {
-  if (!env.RESEND_API_KEY) return { sent: false, error: '邮件服务未配置' };
+  if (!env.EMAIL && !env.RESEND_API_KEY) return { sent: false, error: '邮件服务未配置' };
 
   const escapeHtml = (v: string) =>
     v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -440,7 +440,7 @@ async function sendFeedbackReplyEmail(
 </body>
 </html>`.trim();
 
-  const result = await sendResendEmail(env, {
+  const result = await sendEmail(env, {
     to: recipientEmail,
     subject,
     html: htmlContent,
@@ -454,6 +454,7 @@ async function sendFeedbackReplyEmail(
     recipientEmail,
     emailType: 'feedback_reply',
     status: result.ok ? 'sent' : 'failed',
+    provider: result.provider,
     messageId: result.messageId ?? null,
     templateName: 'feedback_reply',
     subject,

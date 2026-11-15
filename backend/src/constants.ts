@@ -146,6 +146,8 @@ export const DB_CONFIG_KEYS = {
   // 邮件限制 — 防滥用需要动态调整
   EMAIL_RATE_LIMIT_PER_HOUR: 'email_rate_limit_per_hour',
   EMAIL_RATE_LIMIT_PER_DAY: 'email_rate_limit_per_day',
+  /** 邮件服务商：cloudflare（默认，失败回退 Resend）| resend */
+  EMAIL_PROVIDER: 'email_provider',
 
   // 验证码过期时间 — 安全策略需要动态调整
   VERIFICATION_CODE_EXPIRY: 'verification_code_expiry',

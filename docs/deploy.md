@@ -38,7 +38,7 @@
 | 自定义域名 | 托管在 Cloudflare 的 Zone | 用于 Workers Custom Domain |
 | GitHub OAuth App | 必需 | 登录功能依赖 |
 | Google OAuth Client | 可选 | 不配则仅支持 GitHub 登录 |
-| Resend 账号 + 已验证发件域 | 邮件功能需要 | 不配则验证码/通知邮件全部发不出 |
+| Cloudflare Email Sending（Workers Paid）或 Resend 账号 | 邮件功能需要 | 两者都未配置时验证码/通知邮件全部发不出 |
 | TMDB API Key | 可选 | 影视元数据搜索来源，缺失时该来源静默跳过 |
 
 ---
@@ -93,7 +93,7 @@ database_id = "<返回的 database_id>"
 | `JWT_SECRET` | **必需** | 签发/校验 JWT、邮件退订 token | 登录态与退订链接全部失效 |
 | `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | **必需** | GitHub OAuth 登录 | `/api/auth/github/*` 不可用 |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 可选 | Google OAuth 登录 | 该登录入口不可用 |
-| `RESEND_API_KEY` | 邮件功能必需 | 发送验证码、通知、反馈邮件 | 邮件留队列不发，验证码流程不可用 |
+| `RESEND_API_KEY` | 可选 | 邮件服务商为 `resend` 时必需；`cloudflare` 时作为发送失败的回退 | 未配置且 Cloudflare 不可用时，邮件留队列不发，验证码流程不可用 |
 | `RANKINGS_IMPORT_SECRET` | 榜单导入必需 | GitHub Actions 调 `/api/internal/rankings/import` 时的共享密钥 | 导入接口 401 |
 | `TMDB_API_KEY` | 可选 | 影视元数据搜索 | 该来源静默跳过 |
 
@@ -110,6 +110,16 @@ npx wrangler secret put TMDB_API_KEY
 ```
 
 本地开发写入 `backend/.dev.vars`（已 gitignore，格式同上 `KEY=value`）。
+
+#### Cloudflare Email Sending 绑定
+
+`backend/wrangler.toml` 已声明 `[[send_email]] name = "EMAIL"`。启用前确认：
+
+1. 账号为 Workers Paid，并在 **Compute → Email Service → Email Sending** 为发件域完成 onboard；
+2. `DEFAULT_FROM_EMAIL` 属于该已 onboard 域名；
+3. 管理端「系统配置 → 邮件」的 `email_provider` 保持 `cloudflare`（默认）；如需改用 Resend，切到 `resend` 并配置 `RESEND_API_KEY`。
+
+Cloudflare 发送失败时，如果配置了 `RESEND_API_KEY` 会自动回退到 Resend。
 
 ### 3. 代码内的域名白名单（不属于环境变量）
 
@@ -163,6 +173,7 @@ Get-ChildItem ../database/[0-9]*.sql | Sort-Object Name | ForEach-Object {
 | `34_recover_misjudged_magnet_missing` | 重置磁力误判记录的重试计数 | 必需（可重复执行） |
 | `35_jav_detail_job_batch_size_5` | 每分钟补全条数归一为 5 | 必需 |
 | `36_query_perf_indexes_phase2` | 第二轮查询性能索引 | 必需 |
+| `37_email_provider` | 邮件服务商选择配置 | 必需（可重复执行） |
 
 除 `20` 外均可重复执行。本地库把 `--remote` 换成 `--local`。
 
@@ -379,7 +390,7 @@ SPA 回退**只能**由 `wrangler.toml` 的 `not_found_handling = "single-page-a
 
 ### Q6: 邮件全部发不出
 
-按顺序查：`RESEND_API_KEY` 是否配置 → `DEFAULT_FROM_EMAIL` 的域名是否在 Resend 验证过 → `email_send_logs.status` / `error_message` → `email_queue` 是否堆在 `failed` → 用户邮箱是否已验证、通知偏好是否开启。
+按顺序查：`email_provider` 当前值 → 选择 `cloudflare` 时检查 `[[send_email]]` 绑定与 Email Sending 域名 onboard 状态 → 选择 `resend` 时检查 `RESEND_API_KEY` → `DEFAULT_FROM_EMAIL` 的域名是否已在对应服务验证 → `email_send_logs.status` / `error_message` → `email_queue` 是否堆在 `failed` → 用户邮箱是否已验证、通知偏好是否开启。
 
 ### Q7: 页面能打开但所有接口失败
 

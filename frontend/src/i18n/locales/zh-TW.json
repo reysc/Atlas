@@ -1400,7 +1400,8 @@
         "integer": "整數",
         "float": "小數",
         "boolean": "布林值",
-        "json": "JSON"
+        "json": "JSON",
+        "select": "單選"
       },
       "loadFailed": "載入失敗",
       "loadLogsFailed": "載入日誌失敗",

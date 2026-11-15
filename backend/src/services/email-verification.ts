@@ -3,7 +3,7 @@ import { generateId, hashToken, maskEmail } from '@/utils';
 import { CONFIG, DB_CONFIG_KEYS } from '@/constants';
 import { ConfigService } from './config';
 import {
-  sendResendEmail,
+  sendEmail as sendEmailViaProvider,
   logEmailSend as writeEmailSendLog,
   assertVerificationEmailRateLimit,
 } from './email-sender';
@@ -479,7 +479,7 @@ export class EmailVerificationService {
     templateVars: Record<string, unknown> = {},
     logContext: { userId?: string | null; ipAddress?: string | null } = {}
   ): Promise<{ success: boolean; messageId?: string; message: string }> {
-    if (!this.resendApiKey) {
+    if (!this.env.EMAIL && !this.resendApiKey) {
       throw new Error('邮件服务未配置');
     }
 
@@ -508,8 +508,9 @@ export class EmailVerificationService {
     const htmlContent = this.renderTemplate(template.html_template, vars);
     const textContent = this.renderTemplate(template.text_template || '', vars);
 
+    let provider: 'cloudflare' | 'resend' = 'resend';
     try {
-      const result = await sendResendEmail(this.env, {
+      const result = await sendEmailViaProvider(this.env, {
         to: email,
         subject,
         html: htmlContent,
@@ -521,6 +522,7 @@ export class EmailVerificationService {
           { name: 'source', value: 'email-verification' },
         ],
       });
+      provider = result.provider || provider;
 
       if (!result.ok) {
         throw new Error(result.error || '邮件发送失败');
@@ -530,6 +532,7 @@ export class EmailVerificationService {
         recipientEmail: email,
         emailType: mappedTemplateType,
         status: 'sent',
+        provider,
         messageId: result.messageId,
         subject,
         templateName: template.template_name,
@@ -549,6 +552,7 @@ export class EmailVerificationService {
         recipientEmail: email,
         emailType: mappedTemplateType,
         status: 'failed',
+        provider,
         error: (error as Error).message,
         subject,
         templateName: template.template_name,

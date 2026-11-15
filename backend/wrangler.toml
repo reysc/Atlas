@@ -64,6 +64,12 @@ binding = "DB"
 database_name = "codeseek"
 database_id = "42216a7e-3dbb-4feb-9974-2a8ee32af550"
 
+# Cloudflare Email Service（Workers Paid 的 Email Sending）
+# 发送域名需先在 Cloudflare 面板 Compute → Email Service → Email Sending 完成 onboard。
+# 未配置或被管理端切换为 Resend 时不会使用该绑定。
+[[send_email]]
+name = "EMAIL"
+
 # Workers AI（可选）：启用 ENABLE_ALIAS_AI 时取消注释。
 # 账号未开通 Workers AI 时保留注释，否则部署会失败。
 # [ai]
